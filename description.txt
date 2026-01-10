@@ -1,0 +1,3 @@
+Name: Blockland Revive Project
+Author: a_jar_of_cake
+Comes with preferences, 'should be default' add-ons, tools, add-on creator and more!
