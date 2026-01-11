@@ -6,23 +6,66 @@ if(!isObject(EventScript))
     };
 }
 
-function fxDtsBrick::runScript(%brick, %scriptString, %client)
+function fxDtsBrick::createScript(%brick, %name, %client)
 {
     if(!%client.isAdmin)
     {
         return false;
     }
 
-    %tokenHandler = eventScript_tokenize(%scriptString);
+    %tokenHandler = new ScriptObject()
+    {
+        class = "Script";
+        processString = "script " @ %name @ "\n";
+
+        tokens = 0;
+
+        isDone = false;
+    };
+
+    if(isObject(%brick.scriptHandler))
+    {
+        %brick.scriptHandler.delete();
+    }
+
     if(isObject(%tokenHandler))
     {
+        %brick.scriptHandler = %tokenHandler;
+    }
+
+    return true;
+}
+registerOutputEvent("fxDtsBrick", "createScript", "string 50 50");
+
+function fxDtsBrick::editScript(%brick, %scriptString, %client)
+{
+    if(!%client.isAdmin)
+    {
+        return false;
+    }
+
+    if(isObject(%tokenHandler = %brick.scriptHandler))
+    {
+        %tokenHandler.processString = %tokenHandler.processString NL %scriptString;
+    }
+
+    return true;
+}
+registerOutputEvent("fxDtsBrick", "editScript", "string 200 200");
+
+function fxDtsBrick::runScript(%brick, %client)
+{
+    %tokenHandler = %brick.scriptHandler;
+    if(isObject(%tokenHandler))
+    {
+        %tokenHandler.tokenize();
         %tokenHandler.process();
         %tokenHandler.schedule(0, delete);
     }
 
     return true;
 }
-registerOutputEvent("fxDtsBrick", "runScript", "string 50 100");
+registerOutputEvent("fxDtsBrick", "runScript");
 
 function GameConnection::runScript(%gc, %scriptString)
 {
@@ -82,7 +125,7 @@ function Script::tokenize(%script)
             %script.tokens++;
 
             %skipNextWord = 1;
-            // talk("SETTING LOCAL_VAR '" @ %word @ "': " @ %nextWord);
+            talk("SETTING LOCAL_VAR '" @ %word @ "': " @ %nextWord);
         }
         else if(getSubStr(%word, 0, 1) $= "!")
         {
@@ -94,11 +137,11 @@ function Script::tokenize(%script)
             %script.tokens++;
 
             %skipNextWord = 1;
-            // talk("SETTING GROUP_VAR '" @ %word @ "': " @ %nextWord);
+            talk("SETTING GROUP_VAR '" @ %word @ "': " @ %nextWord);
         }
         else if(%word $= "call")
         {
-            // talk("CALL '" @ %nextWord @ "' for EventScript");
+            talk("CALL '" @ %nextWord @ "' for EventScript");
             
             %script.token[%script.tokens] = "function"; 
             %script.tokenType[%script.tokens] = "function_call";
@@ -109,7 +152,7 @@ function Script::tokenize(%script)
         }
         else
         {
-            talk("UNKNOWN TOKEN '" @ %word @ "'");
+            // talk("UNKNOWN TOKEN '" @ %word @ "'");
         }
     }
 
@@ -118,5 +161,37 @@ function Script::tokenize(%script)
 
 function Script::process(%script)
 {
+    talk("PROCESSING");
+    talk("  script tokens: " @ %script.tokens);
     
+    for(%l = 0; %l < getLineCount(%script.processString); %l++)
+    {
+        %processLine = getLine(%script.processString, %l);
+
+        if(getWord(%processLine, 0) $= "script")
+        {
+            %script.name = getWords(%processLine, 1, 999);
+            talk("  setting script name to: " @ %script.name);
+        }
+        else
+        {
+            for(%i = 0; %i < %script.tokens; %i++)
+            {
+                if(%script.tokenType[%i] $= "function_call")
+                {
+                    talk("   found - FUNC");
+                }
+                else if(%script.tokenType[%i] $= "group_var")
+                {
+                    talk("   found - group '" @ %script.tokenValue[%i] @ "'");
+                }
+                else if(%script.tokenType[%i] $= "local_var")
+                {
+                    talk("   found - local '" @ %script.tokenValue[%i] @ "'");
+                }
+            }
+        }
+
+        talk("    parseLine --> " @ %processLine);
+    }
 }
